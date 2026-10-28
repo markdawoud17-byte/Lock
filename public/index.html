@@ -17,6 +17,9 @@
   #err { color:#ef4444; height:1.3em; margin-top:10px; }
   .link { word-break:break-all; font-size:.8rem; background:#0f172a; padding:10px; border-radius:8px; margin:14px auto 0; max-width:420px; user-select:all; }
   .hidden { display:none !important; }
+  #popup { position:fixed; inset:0; background:rgba(2,6,23,.85); display:flex; align-items:center; justify-content:center; padding:24px; z-index:10; }
+  #popup .card { background:#0f172a; border:1px solid #334155; border-radius:16px; padding:28px; width:100%; max-width:360px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  #popup h2 { margin:8px 0; font-size:1.8rem; }
 </style>
 </head>
 <body>
@@ -29,6 +32,16 @@
   <input id="pin" type="password" inputmode="numeric" placeholder="Leave code" autocomplete="off">
   <div id="err"></div>
   <button onclick="tryUnlock()">Unlock</button>
+</div>
+
+<!-- POPUP: pops up when the screen locks, and again if they leave -->
+<div id="popup" class="hidden">
+  <div class="card">
+    <div class="big">🔒</div>
+    <h2>Your screen is locked</h2>
+    <p id="popmsg">Enter the leave code from your teacher to unlock.</p>
+    <button onclick="closePopup()">OK</button>
+  </div>
 </div>
 
 <!-- DONE -->
@@ -77,9 +90,19 @@ function goFullscreen(){
     .then(() => navigator.keyboard?.lock?.(["Escape"]).catch(() => {}))
     .catch(() => {});
 }
+function showPopup(text){
+  if(text) $("popmsg").textContent = text;
+  $("popup").classList.remove("hidden");
+}
+function closePopup(){
+  $("popup").classList.add("hidden");
+  goFullscreen(); /* the OK click allows fullscreen */
+  $("pin").focus();
+}
 function lock(){
   locked = true;
   $("lock").classList.remove("hidden");
+  showPopup();
   if(params.get("m")) $("msg").textContent = params.get("m");
   goFullscreen(); /* works if the browser allows it; otherwise the first touch below does it */
   setTimeout(() => $("pin").focus(), 100);
@@ -90,6 +113,7 @@ function lock(){
 function nag(){
   if(!locked) return;
   $("err").textContent = "Stay on this screen. Click anywhere to return to fullscreen.";
+  showPopup("Your screen is still locked. Stay on this page and enter the leave code.");
 }
 document.addEventListener("fullscreenchange", () => { if(locked && !document.fullscreenElement) nag(); });
 document.addEventListener("visibilitychange", () => { if(locked && document.hidden) nag(); });
@@ -97,6 +121,7 @@ window.addEventListener("blur", nag);
 async function tryUnlock(){
   if(await sha($("pin").value) === hash){
     locked = false;
+    $("popup").classList.add("hidden");
     $("lock").classList.add("hidden");
     $("free").classList.remove("hidden");
     if(document.fullscreenElement) document.exitFullscreen?.();
