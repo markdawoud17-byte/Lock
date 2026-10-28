@@ -38,7 +38,7 @@
 <div id="popup" class="hidden" onclick="closePopup()">
   <div class="card">
     <div class="big">🔒</div>
-    <h2>Your screen is locked</h2>
+    <h2 id="poptitle">Your screen is locked</h2>
     <p id="popmsg">Enter the leave code from your teacher to unlock.</p>
     <p style="font-size:.85rem;margin-bottom:0">Press any key or tap anywhere to continue.</p>
   </div>
@@ -91,10 +91,24 @@ function goFullscreen(){
     .then(() => navigator.keyboard?.lock?.(["Escape"]).catch(() => {}))
     .catch(() => {});
 }
-function showPopup(text){
+function showPopup(text, title){
   if(text) $("popmsg").textContent = text;
+  $("poptitle").textContent = title || "Your screen is locked";
   $("popup").classList.remove("hidden");
 }
+/* Holding ESC (or leaving fullscreen right after pressing it) shows a warning */
+let lastEsc = 0;
+function escWarn(){
+  lastEsc = Date.now();
+  $("err").textContent = "STOP TRYING TO GET OFF";
+  showPopup("Your screen is locked. Enter the leave code from your teacher.", "🛑 STOP TRYING TO GET OFF");
+}
+document.addEventListener("keyup", e => {
+  if(!locked || e.key !== "Escape") return;
+  setTimeout(() => {
+    if(Date.now() - lastEsc >= 2400){ $("popup").classList.add("hidden"); $("err").textContent = ""; }
+  }, 2500);
+}, true);
 function closePopup(){
   $("popup").classList.add("hidden");
   goFullscreen(); /* the OK click allows fullscreen */
@@ -110,9 +124,10 @@ function lock(){
 }
 /* Browsers only allow fullscreen after a user action, so the first touch/key goes fullscreen.
    Any key/tap also dismisses the popup, so nobody has to press OK. */
-["pointerdown", "touchstart", "keydown"].forEach(ev => document.addEventListener(ev, () => {
+["pointerdown", "touchstart", "keydown"].forEach(ev => document.addEventListener(ev, e => {
   if(!locked) return;
   goFullscreen();
+  if(ev === "keydown" && e.key === "Escape"){ escWarn(); return; }
   $("popup").classList.add("hidden");
 }, true));
 /* Re-lock automatically: if fullscreen is ever exited (e.g. holding ESC), keep trying to go back.
@@ -127,6 +142,7 @@ function nag(){
 document.addEventListener("fullscreenchange", () => {
   if(!locked) return;
   if(document.fullscreenElement) $("popup").classList.add("hidden");
+  else if(Date.now() - lastEsc < 3000){ goFullscreen(); escWarn(); }
   else { goFullscreen(); showPopup("You left fullscreen. Your screen is still locked. Press any key or tap to go back."); nag(); }
 });
 document.addEventListener("visibilitychange", () => { if(locked && document.hidden) nag(); });
