@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locked</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:#020617; color:#f1f5f9; min-height:100vh; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; }
+  .box { width:100%; max-width:420px; }
+  .big { font-size:4.5rem; }
+  h1 { font-size:2.4rem; margin:8px 0; }
+  p { color:#94a3b8; }
+  input { width:100%; max-width:260px; padding:14px; border-radius:10px; border:1px solid #334155; background:#0f172a; color:#f1f5f9; font-size:1.4rem; text-align:center; letter-spacing:.3em; }
+  input.plain { letter-spacing:normal; font-size:1rem; }
+  button { display:block; margin:14px auto 0; width:100%; max-width:260px; padding:14px; border:0; border-radius:10px; background:#3b82f6; color:#fff; font-size:1rem; font-weight:600; cursor:pointer; }
+  #err { color:#ef4444; height:1.3em; margin-top:10px; }
+  .link { word-break:break-all; font-size:.8rem; background:#0f172a; padding:10px; border-radius:8px; margin:14px auto 0; max-width:420px; user-select:all; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN: shown immediately when the link contains a code -->
+<div id="lock" class="box hidden">
+  <div class="big">🔒</div>
+  <h1>Screen locked</h1>
+  <p id="msg">Enter the leave code from your teacher.</p>
+  <input id="pin" type="password" inputmode="numeric" placeholder="Leave code" autocomplete="off">
+  <div id="err"></div>
+  <button onclick="tryUnlock()">Unlock</button>
+</div>
+
+<!-- DONE -->
+<div id="free" class="box hidden">
+  <div class="big">🔓</div>
+  <h1>You're free!</h1>
+  <p>You can close this tab.</p>
+</div>
+
+<!-- TEACHER SETUP: shown when opened with no code -->
+<div id="setup" class="box hidden">
+  <h1>Teacher setup</h1>
+  <p>Choose a leave code, get a link, and give students the link. Anyone who opens it is locked until they enter the code.</p>
+  <input id="newpin" class="plain" type="text" inputmode="numeric" placeholder="Leave code (4–8 digits)">
+  <input id="newmsg" class="plain" style="margin-top:10px" type="text" placeholder="Message (optional)">
+  <button onclick="makeLink()">Create student link</button>
+  <div id="link" class="link hidden"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const hash = params.get("h");
+let locked = false;
+
+async function sha(s){
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("lockonopen:" + s));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+
+/* Teacher: build the link */
+async function makeLink(){
+  const pin = $("newpin").value.trim();
+  if(!/^\d{4,8}$/.test(pin)) return alert("Leave code must be 4–8 digits.");
+  let url = location.origin + location.pathname + "?h=" + await sha(pin);
+  const m = $("newmsg").value.trim();
+  if(m) url += "&m=" + encodeURIComponent(m);
+  $("link").textContent = url;
+  $("link").classList.remove("hidden");
+}
+
+/* Student: lock */
+function lock(){
+  locked = true;
+  $("lock").classList.remove("hidden");
+  if(params.get("m")) $("msg").textContent = params.get("m");
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  setTimeout(() => $("pin").focus(), 100);
+}
+async function tryUnlock(){
+  if(await sha($("pin").value) === hash){
+    locked = false;
+    $("lock").classList.add("hidden");
+    $("free").classList.remove("hidden");
+    if(document.fullscreenElement) document.exitFullscreen?.();
+  } else {
+    $("err").textContent = "Wrong code";
+    $("pin").value = "";
+  }
+}
+$("pin").addEventListener("keydown", e => { if(e.key === "Enter") tryUnlock(); });
+
+/* Make it hard to leave while locked */
+document.addEventListener("click", () => { if(locked && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {}); });
+document.addEventListener("contextmenu", e => { if(locked) e.preventDefault(); });
+document.addEventListener("keydown", e => { if(locked && e.target.id !== "pin") e.preventDefault(); });
+window.addEventListener("beforeunload", e => { if(locked){ e.preventDefault(); e.returnValue = ""; } });
+
+if(hash) lock(); else $("setup").classList.remove("hidden");
+</script>
+</body>
+</html>
