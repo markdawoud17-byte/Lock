@@ -64,7 +64,8 @@
 <script>
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
-const hash = params.get("h");
+const DEFAULT_CODE = "4729"; /* leave code used when the site is opened without a custom link */
+let hash = params.get("h");
 let locked = false;
 
 async function sha(s){
@@ -142,7 +143,12 @@ document.addEventListener("contextmenu", e => { if(locked) e.preventDefault(); }
 document.addEventListener("keydown", e => { if(locked && e.target.id !== "pin") e.preventDefault(); });
 window.addEventListener("beforeunload", e => { if(locked){ e.preventDefault(); e.returnValue = ""; } });
 
-if(hash) lock(); else $("setup").classList.remove("hidden");
+/* Everyone who opens the site is locked at once. Teachers open /?teacher to make custom links. */
+(async () => {
+  if(params.has("teacher")){ $("setup").classList.remove("hidden"); return; }
+  if(!hash) hash = await sha(DEFAULT_CODE);
+  lock();
+})();
 </script>
 </body>
 </html>
