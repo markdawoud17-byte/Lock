@@ -97,14 +97,27 @@ function showPopup(text, title){
   $("popup").classList.remove("hidden");
 }
 /* Holding ESC (or leaving fullscreen right after pressing it) shows a warning */
-let lastEsc = 0, lastSpoke = 0;
+let lastEsc = 0, lastSpoke = 0, primed = false;
+/* Browsers only let speech play after a user gesture, so "prime" it silently on the first press/tap.
+   After that, ESC can speak the instant it is touched. */
+function primeSpeech(){
+  if(primed || !window.speechSynthesis) return;
+  primed = true;
+  try{
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    speechSynthesis.speak(u);
+    speechSynthesis.getVoices();
+  }catch(_){}
+}
 function speakStop(){
-  if(Date.now() - lastSpoke < 2500 || !window.speechSynthesis) return;
+  if(Date.now() - lastSpoke < 1500 || !window.speechSynthesis) return;
   lastSpoke = Date.now();
   try{
     speechSynthesis.cancel();
+    speechSynthesis.resume();
     const u = new SpeechSynthesisUtterance("Stop trying to get off");
-    u.rate = 0.9; u.volume = 1;
+    u.rate = 0.95; u.volume = 1; u.lang = "en-US";
     speechSynthesis.speak(u);
   }catch(_){}
 }
@@ -116,6 +129,7 @@ function escWarn(){
 }
 document.addEventListener("keyup", e => {
   if(!locked || e.key !== "Escape") return;
+  lastEsc = Date.now(); speakStop();
   setTimeout(() => {
     if(Date.now() - lastEsc >= 2400){ $("popup").classList.add("hidden"); $("err").textContent = ""; }
   }, 2500);
@@ -137,6 +151,8 @@ function lock(){
    Any key/tap also dismisses the popup, so nobody has to press OK. */
 ["pointerdown", "touchstart", "keydown"].forEach(ev => document.addEventListener(ev, e => {
   if(!locked) return;
+  primeSpeech();
+  if(ev === "keydown" && e.key === "Escape"){ lastEsc = Date.now(); speakStop(); }
   goFullscreen();
   if(ev === "keydown" && e.key === "Escape"){ escWarn(); return; }
   $("popup").classList.add("hidden");
@@ -154,7 +170,7 @@ document.addEventListener("fullscreenchange", () => {
   if(!locked) return;
   if(document.fullscreenElement) $("popup").classList.add("hidden");
   else if(Date.now() - lastEsc < 3000){ goFullscreen(); escWarn(); }
-  else { goFullscreen(); showPopup("You left fullscreen. Your screen is still locked. Press any key or tap to go back."); nag(); }
+  else { speakStop(); goFullscreen(); showPopup("You left fullscreen. Your screen is still locked. Press any key or tap to go back."); nag(); }
 });
 document.addEventListener("visibilitychange", () => { if(locked && document.hidden) nag(); });
 window.addEventListener("blur", nag);
