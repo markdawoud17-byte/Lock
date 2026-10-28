@@ -70,14 +70,30 @@ async function makeLink(){
   $("link").classList.remove("hidden");
 }
 
-/* Student: lock */
+/* Student: lock automatically on open */
+function goFullscreen(){
+  if(!locked || document.fullscreenElement) return;
+  document.documentElement.requestFullscreen?.()
+    .then(() => navigator.keyboard?.lock?.(["Escape"]).catch(() => {}))
+    .catch(() => {});
+}
 function lock(){
   locked = true;
   $("lock").classList.remove("hidden");
   if(params.get("m")) $("msg").textContent = params.get("m");
-  document.documentElement.requestFullscreen?.().catch(() => {});
+  goFullscreen(); /* works if the browser allows it; otherwise the first touch below does it */
   setTimeout(() => $("pin").focus(), 100);
 }
+/* Browsers only allow fullscreen after a user action, so the first touch/key goes fullscreen */
+["pointerdown", "touchstart", "keydown"].forEach(ev => document.addEventListener(ev, goFullscreen, true));
+/* If they leave fullscreen or switch tabs while locked, make them come back */
+function nag(){
+  if(!locked) return;
+  $("err").textContent = "Stay on this screen. Click anywhere to return to fullscreen.";
+}
+document.addEventListener("fullscreenchange", () => { if(locked && !document.fullscreenElement) nag(); });
+document.addEventListener("visibilitychange", () => { if(locked && document.hidden) nag(); });
+window.addEventListener("blur", nag);
 async function tryUnlock(){
   if(await sha($("pin").value) === hash){
     locked = false;
