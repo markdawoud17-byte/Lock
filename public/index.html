@@ -40,7 +40,7 @@
     <div class="big">🔒</div>
     <h2>Your screen is locked</h2>
     <p id="popmsg">Enter the leave code from your teacher to unlock.</p>
-    <button onclick="closePopup()">OK</button>
+    <p style="font-size:.85rem;margin-bottom:0">Press any key or tap anywhere to continue.</p>
   </div>
 </div>
 
@@ -108,8 +108,16 @@ function lock(){
   goFullscreen(); /* works if the browser allows it; otherwise the first touch below does it */
   setTimeout(() => $("pin").focus(), 100);
 }
-/* Browsers only allow fullscreen after a user action, so the first touch/key goes fullscreen */
-["pointerdown", "touchstart", "keydown"].forEach(ev => document.addEventListener(ev, goFullscreen, true));
+/* Browsers only allow fullscreen after a user action, so the first touch/key goes fullscreen.
+   Any key/tap also dismisses the popup, so nobody has to press OK. */
+["pointerdown", "touchstart", "keydown"].forEach(ev => document.addEventListener(ev, () => {
+  if(!locked) return;
+  goFullscreen();
+  $("popup").classList.add("hidden");
+}, true));
+/* Re-lock automatically: if fullscreen is ever exited (e.g. holding ESC), keep trying to go back.
+   The browser allows it as soon as there is any click/key/tap, so the very first press re-locks. */
+setInterval(() => { if(locked && !document.fullscreenElement) goFullscreen(); }, 250);
 /* If they leave fullscreen or switch tabs while locked, make them come back */
 function nag(){
   if(!locked) return;
@@ -119,7 +127,7 @@ function nag(){
 document.addEventListener("fullscreenchange", () => {
   if(!locked) return;
   if(document.fullscreenElement) $("popup").classList.add("hidden");
-  else { showPopup("You left fullscreen. Your screen is still locked. Click anywhere to go back."); nag(); }
+  else { goFullscreen(); showPopup("You left fullscreen. Your screen is still locked. Press any key or tap to go back."); nag(); }
 });
 document.addEventListener("visibilitychange", () => { if(locked && document.hidden) nag(); });
 window.addEventListener("blur", nag);
